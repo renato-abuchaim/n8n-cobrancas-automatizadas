@@ -26,11 +26,8 @@ Automação para envio de lembretes de cobrança por e-mail para clientes com fa
 
 ## 📂 Estrutura do Projeto
 📦 n8n-cobrancas-automatizadas
-
 ┣ 📜 workflow.json
-
 ┣ 🖼️ workflow.png
-
 ┗ 📜 README.md
 
 ---
