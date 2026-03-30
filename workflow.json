@@ -1,0 +1,172 @@
+{
+  "name": "Envia cobrança a vencer (SAFE VERSION)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 4,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, -80],
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "asaas-api-url",
+              "value": "={{ $env.ASAAS_API_URL }}",
+              "type": "string"
+            },
+            {
+              "name": "token",
+              "value": "={{ $env.ASAAS_API_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "name": "dias-vencimento",
+              "value": "={{ $env.DIAS_VENCIMENTO || 5 }}",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [240, -80],
+      "name": "Parâmetros"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json['asaas-api-url'] }}/customers",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "limit", "value": "100" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, -160],
+      "name": "Obter clientes"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json['asaas-api-url'] }}/payments",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "limit", "value": "100" },
+            { "name": "status", "value": "PENDING" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 20],
+      "name": "Obter cobranças"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data"
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "position": [680, -160],
+      "name": "Lista clientes"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data"
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "position": [680, 20],
+      "name": "Lista cobranças"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": [
+            { "field1": "id", "field2": "customer" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.merge",
+      "position": [900, -80],
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ Math.ceil((new Date($json.dueDate).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000) }}",
+              "rightValue": "={{ $json['dias-vencimento'] }}",
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.filter",
+      "position": [1120, -80],
+      "name": "Filtro vencimento"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [1340, -80],
+      "name": "Loop"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ ($json.name || 'Cliente').split(' ')[0] + ', sua fatura está próxima do vencimento' }}",
+        "message": "={{ ($json.name || 'Cliente').split(' ')[0] + ', sua fatura vence em ' + $json.dueDate }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "position": [1580, -60],
+      "name": "Enviar email"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "position": [1780, -60],
+      "name": "Wait"
+    }
+  ]
+}
